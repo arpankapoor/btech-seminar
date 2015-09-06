@@ -1,0 +1,41 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage{hyperref,csquotes}
+\usepackage[backend=biber]{biblatex}
+
+\addbibresource{ref.bib}
+
+\hypersetup{
+	hidelinks,
+	pdftitle={Pretty Good Privacy},
+	pdfauthor={Arpan Kapoor},
+	pdfsubject={Seminar Abstract},
+	pdfkeywords={seminar,abstract}
+}
+
+\begin{document}
+
+\title{\Huge{Pretty Good Privacy}}
+\author{Arpan Kapoor\\
+	\texttt{B120555CS}, A Batch\\
+	\href{mailto:arpan_b120555cs@nitc.ac.in}
+	{\nolinkurl{arpan_b120555cs@nitc.ac.in}}\\[0.30cm]
+	Department of Computer Science \& Engineering\\
+	National Institute of Technology Calicut
+}
+\date{\today}
+
+\maketitle
+
+\begin{abstract}
+With the increasing surveillance efforts on the Internet by various governments,
+the demand\slash need for privacy has also escalated. PGP empowers people to
+take their privacy in their own hands. It provides security services for
+electronic communication and data storage using a combination of strong
+public-key and symmetric cryptography. These services include confidentiality,
+key management, authentication, and digital signatures.
+\end{abstract}
+
+\nocite{*}
+\printbibliography
+
+\end{document}
