@@ -1,12 +1,14 @@
 \documentclass[12pt,a4paper]{article}
-\usepackage{hyperref,csquotes}
+\usepackage[english]{babel}
 \usepackage[backend=biber]{biblatex}
+\usepackage{csquotes}
+\usepackage{hyperref}
 
 \addbibresource{ref.bib}
 
 \hypersetup{
 	hidelinks,
-	pdftitle={Pretty Good Privacy},
+	pdftitle={Dynamic Searchable Symmetric Encryption},
 	pdfauthor={Arpan Kapoor},
 	pdfsubject={Seminar Abstract},
 	pdfkeywords={seminar,abstract}
@@ -14,12 +16,12 @@
 
 \begin{document}
 
-\title{\Huge{Pretty Good Privacy}}
+\title{Dynamic Searchable Symmetric Encryption}
 \author{Arpan Kapoor\\
 	\href{mailto:arpan_b120555cs@nitc.ac.in}
 	{\nolinkurl{arpan_b120555cs@nitc.ac.in}}
 }
-\date{\today}
+\date{September 20, 2015}
 
 \maketitle
 
@@ -28,23 +30,18 @@
 \end{center}
 
 \begin{abstract}
-With the increasing surveillance efforts on the Internet by various governments,
-the demand\slash need for privacy has also escalated. PGP empowers people to
-take their privacy in their own hands. It provides security services for
-electronic communication and data storage using a combination of strong
-public-key and symmetric cryptography. These services include confidentiality,
-key management, authentication, and digital signatures.
+Searchable symmetric encryption (SSE) allows a client to encrypt its data in
+such a way that this data can still be searched. The most immediate application
+of SSE is to cloud storage, where it enables a client to securely outsource its
+data to an untrusted cloud provider without sacrificing the ability to search
+over it.
+
+A practical SSE scheme should (at a minimum) satisfy the following properties:
+sublinear search time, security against adaptive chosen-keyword attacks,
+compact indexes and the ability to add and delete files efficiently.
+A SSE scheme to satisfy all the properties outlined above is discussed.
 \end{abstract}
-
-\subsubsection*{Concepts to be covered in seminar:}
-\begin{itemize}
-	\item Basics of cryptography
-	\item Services provided by PGP
-	\item How PGP works
-\end{itemize}
-
 
 \nocite{*}
 \printbibliography
-
 \end{document}
