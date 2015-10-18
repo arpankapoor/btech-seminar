@@ -1,6 +1,6 @@
 \documentclass[12pt,a4paper]{article}
 \usepackage{algorithm,algpseudocode}
-\usepackage{amsmath,amssymb}
+\usepackage{amsmath,amssymb,amsthm}
 \usepackage[english]{babel}
 \usepackage[backend=biber]{biblatex}
 \usepackage[utf8]{inputenc}		% This has to come before csquotes
@@ -9,9 +9,12 @@
 \usepackage{graphicx}
 \usepackage{hyperref}
 \usepackage{lmodern}
-\usepackage{setspace}
+\usepackage{mathtools}
 
 \addbibresource{./ref.bib}
+
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
 
 \newcommand{\myBranchName}{Computer Science and Engineering}
 \newcommand{\myCollegeName}{National Institute of Technology, Calicut}
@@ -36,40 +39,234 @@
 \include{abstract}
 
 \tableofcontents
+\clearpage
 
 % INTRODUCTION
-\clearpage
 \section{Introduction}
 
-YOUR INTRODUCTION HERE.
+Cloud storage is ubiquitous and widely used for services such as backups or
+outsourcing data to reduce operational costs. However, these remote servers
+cannot be trusted, because administrators, or intruders with root rights, have
+full access to the server and consequently to the plaintext data. Thus, to
+store sensitive data in a secure way on an untrusted server, the data has to be
+encrypted. Simple encryption is however a hindrance to search capabilities for
+the data owner. A trivial but \emph{impractical} solution to re-enable
+searching functionality is to download the whole database, decrypt it locally,
+and then search for the desired results in the plaintext data.
 
-
-% LITERATURE SURVEY
+\textbf{Searchable symmetric encryption (SSE)} is a cryptographic primitive
+addressing encrypted search. It allows a client to encrypt data in such a
+way that it can later generate search tokens to send as queries to a storage
+server. Given a token, the server can search over the encrypted data and return
+the appropriate encrypted files.
 \clearpage
-\section{Literature Survey}
 
-YOUR LITERATURE SURVEY HERE.
+\section{Preliminaries}
+
+\begin{definition}[Symmetric Key Encryption]
+A private-key encryption scheme is a set of three polynomial-time algorithms
+\(\mathsf{SKE = (Gen, Enc, Dec)}\) such that:
+\begin{enumerate}
+\item The \emph{key-generation algorithm} \(\mathsf{Gen}\) is a probabilistic
+	algorithm that outputs a secret key \(K\).
+\item The \emph{encryption algorithm} \(\mathsf{Enc}\) takes as input a key
+	\(K\) and a message \(m\) and returns a ciphertext \(c\).
+\item The \emph{decryption algorithm} \(\mathsf{Dec}\) takes as input a key
+	\(K\) and a ciphertext \(c\) and returns \(m\) if \(K\) was the key
+	under which \(c\) was produced.
+\end{enumerate}
+\end{definition}
 
 
-% SYSTEM PRINCIPLES
+\begin{definition}[Pseudorandom Function]
+A polynomial-time computable function that cannot be distinguished from random
+functions by any probabilistic polynomial-time adversary.
+\end{definition}
+
+
+\begin{definition}[Homomorphic Encryption]
+An operation performed on a set of ciphertexts such that decrypting
+the result of the operation is the same as the result of some operation
+performed on the plaintexts.
+\end{definition}
 \clearpage
-\section{System Principles}
-
-YOUR SYSTEM PRINCIPLES HERE.
 
 
-% DESIGN
+\section{Definitions}
+
+Searchable encryption allows a client to encrypt data in such a way that
+it can later generate search tokens to send as queries to a storage
+server. Given a search token, the server can search over the encrypted data
+and return the appropriate encrypted files.
+
+The data can be viewed as a sequence of \(n\) files
+\(\mathbf{f} = (f_1, \dotsc, f_n)\), where file \(f_i\) is a sequence of words
+\((w_1, \dotsc, w_m)\) from a universe \(W\). Each file
+has a unique identifier \(\mathsf{id}(f_i)\). The data is dynamic, so at
+any time a file may be added or removed. The files can be any type of data as
+long as there exists an efficient algorithm that maps each document to a
+file of keywords from \(W\). Given a
+keyword \(w\), \(\mathbf{f}_w\) denotes the set of files in \(\mathbf{f}\)
+that contain \(w\). If \(\mathbf{c} = (c_1 ,\dotsc, c_n)\) is a set of
+encryptions of the files in \(\mathbf{f}\), then \(\mathbf{c}_w\) refers
+to the ciphertexts that are encryptions of the files in \(\mathbf{f}_w\).
+
+\begin{definition}[Dynamic SSE]
+A dynamic index-based SSE scheme is a set of nine polynomial-time algorithms
+\(\mathsf{SSE = (Gen,}\) \(\mathsf{Enc,}\) \(\mathsf{SrchToken,}\)
+\(\mathsf{AddToken,}\) \(\mathsf{DelToken,}\) \(\mathsf{Search,}\)
+\(\mathsf{Add,}\) \(\mathsf{Del,}\) \(\mathsf{Dec})\) such that:
+
+\begin{enumerate}
+\item \(K \leftarrow \mathsf{Gen}(1^k)\): is a probabilistic algorithm that
+	takes as input a security parameter \(k\) and outputs a secret key
+	\(K\).
+
+\item \((\gamma, \mathbf{c}) \leftarrow \mathsf{Enc}(K, \mathbf{f})\): is a
+	probabilistic algorithm that takes as input a secret key \(K\) and
+	a sequence of files \(\mathbf{f}\). It outputs an encrypted index
+	\(\gamma\), and a sequence of ciphertexts \(\mathbf{c}\).
+
+\item \(\tau_s \leftarrow \mathsf{SrchToken}(K, w)\): is a (possibly
+	probabilistic) algorithm that takes as input a secret key \(K\) and a
+	keyword \(w\). It outputs a search token \(\tau_s\).
+
+\item \((\tau_a, c_f) \leftarrow \mathsf{AddToken}(K, f)\): is a (possibly
+	probabilistic) algorithm that takes as input a secret key \(K\) and a
+	file \(f\). It outputs an add token \(\tau_a\) and a ciphertext
+	\(c_f\).
+
+\item \(\tau_d \leftarrow \mathsf{DelToken}(K, f)\): is a (possibly
+	probabilistic) algorithm that takes as input a secret key \(K\) and a
+	file \(f\). It outputs a delete token \(\tau_d\).
+
+\item \(\mathbf{I}_w \coloneqq \mathsf{Search}(\gamma, \mathbf{c}, \tau_s)\):
+	is a deterministic algorithm that takes as input an encrypted index
+	\(\gamma\), a sequence of ciphertexts \(\mathbf{c}\) and a search
+	token \(\tau_s\). It outputs a sequence of identifiers \(\mathbf{I}_w
+	\subseteq \mathbf{c}\).
+
+\item \((\gamma', \mathbf{c}') \coloneqq \mathsf{Add}(\gamma, \mathbf{c},
+	\tau_a, c)\): is a deterministic algorithm that takes as input an
+	encrypted index \(\gamma\), a sequence of ciphertexts \(\mathbf{c}\),
+	an add token \(\tau_a\) and a ciphertext \(c\). It outputs a new
+	encrypted index \(\gamma'\) and sequence of ciphertexts
+	\(\mathbf{c}'\).
+
+\item \((\gamma', \mathbf{c}') \coloneqq \mathsf{Del}(\gamma, \mathbf{c},
+	\tau_d)\): is a deterministic algorithm that takes as input an
+	encrypted index \(\gamma\), a sequence of ciphertexts \(\mathbf{c}\),
+	and a delete token \(\tau_d\). It outputs a new encrypted index
+	\(\gamma'\) and sequence of ciphertexts \(\mathbf{c}'\).
+
+\item \(f \coloneqq \mathsf{Dec}(K, c)\): is a deterministic algorithm
+	that takes as input a secret key \(K\) and a ciphertext \(c\) and
+	outputs a file \(f\).
+\end{enumerate}
+
+A dynamic SSE scheme is correct if for all \(k \in \mathbb{N}\), for all
+keys \(K\) generated by \(\mathsf{Gen}(1^k)\), for all \(\mathbf{f}\), for all
+\((\gamma, \mathbf{c})\) output by \(\mathsf{Enc}(K, \mathbf{f})\), and
+for all sequences of add, delete or search operations on \(\gamma\), search
+always returns the correct set of indices.
+\end{definition}
 \clearpage
-\section{Design}
 
-YOUR DESIGN HERE.
 
+\section{Construction}
+
+The dynamic SSE scheme is an extension of the non-dynamic SSE-1 construction,
+which is based on the inverted index data structure.
+
+\subsection{SSE-1 construction}
+
+The scheme makes use of a symmetric-key encryption scheme
+\(\mathsf{SKE = (Gen,}\) \(\mathsf{Enc,}\) \(\mathsf{Dec)}\),
+two pseudorandom functions \(F\) and \(G\),
+an array \(\mathtt{A}_s\) referred to as the \emph{search array} and a
+dictionary \(\mathtt{T}_s\) referred to as the \emph{search table}.
+
+To encrypt a collection of files \(\mathbf{f}\), the scheme constructs
+for each keyword \(w \in W\) a list \(\mathtt{L}_w\) composed of
+\(\#\mathbf{f}_w\) nodes
+\((\mathtt{N}_1, \dotsc, \mathtt{N}_{\#\mathbf{f}_w})\) that are stored at
+random locations in the search array \(\mathtt{A}_s\). The node
+\(\mathtt{N}_i\) is defined as
+\(\mathtt{N}_i = \langle \mathsf{id, addr}_s(\mathtt{N}_{i+1}) \rangle\),
+where \(\mathsf{id}\) is the unique file identifier of a file that contains
+\(w\) and \(\mathsf{addr}_s(\mathtt{N})\) denotes the location of
+node \(\mathtt{N}\) in \(\mathtt{A}_s\).
+The unused cells in \(\mathtt{A}_s\) can be padded with random strings of
+appropriate length.
+
+For each keyword \(w\), a pointer to the head of \(\mathtt{L}_w\) is then
+inserted into the search table \(\mathtt{T}_s\) under search key
+\(F_{K_1}(w)\), where \(K_1\) is the key to the PRF \(F\). Each list
+is then encrypted using \(\mathsf{SKE}\) under a key generated
+as \(G_{K_2}(w)\), where \(K_2\) is the key to the PRF \(G\).
+
+To search for a keyword \(w\), the client sends the values \(F_{K_1}(w)\) and
+\(G_{K_2}(w)\). The server then uses \(F_{K_1}(w)\) with \(\mathtt{T}_s\)
+to recover the pointer to the head of \(\mathtt{L}_w\).
+\(G_{K_2}(w)\) is then used to decrypt the list and recover the identifiers
+of the files that contain \(w\). If \(\mathtt{T}\) supports
+\(O(1)\) lookups (for example, using a hash table),
+the total search time for the server is linear in
+\(\#\mathbf{f}_w\), which is optimal.
+\clearpage
+
+\subsection{Dynamic SSE}
+
+The limitations of SSE-1 is that it is not explicitly dynamic.
+
+The difficulty is that the addition, deletion or modification of a
+file requires the server to add, delete or modify nodes in the
+encrypted lists stored in \(\mathtt{A}_s\).
+This is difficult for the server to do since:
+
+\begin{enumerate}
+\item upon deletion of a file \(f\), it does not know where
+	(in \(\mathtt{A}\)) the nodes corresponding to \(f\) are stored.
+\item upon insertion or deletion of a node from a list, it cannot
+	modify the pointer of the previous node since it is encrypted.
+\item upon addition of a node, it does not know which locations in
+	\(\mathtt{A}_s\) are free.
+\end{enumerate}
+
+At a high level, these limitations are addressed as follows:
+
+
+\begin{enumerate}
+\item Add an extra (encrypted) data structure
+	\(\mathtt{A}_d\) called the \emph{deletion array} that
+	stores for each file \(f\) a list \(\mathtt{L}_f\)
+	of nodes that point to the nodes in \(\mathtt{A}_s\) that should be
+	deleted if file \(f\) is ever removed. So every node in the
+	search array has a corresponding node in the deletion array and
+	every node in the deletion array points to a node in the search array.
+\item Encrypt the pointers stored in a node with
+	a homomorphic encryption scheme. By providing the server with an
+	encryption of an appropriate value, it can then modify the pointer
+	without ever having to decrypt the node.
+\item To keep track of which locations in \(\mathtt{A}_s\)
+	are free, a free list is maintained to add and manage extra space
+	the server uses to add new nodes.
+\end{enumerate}
+\clearpage
 
 % CONCLUSION
-\clearpage
 \section{Conclusion}
+Searchable encryption has become an important problem in security and
+cryptography primarily due to the wide proliferation of sensitive data
+in open information and communication infrastructures like Amazon S3 and
+Microsoft Azure Storage. For example, legislation around the world
+stipulates that electronic health records (EHRs) should be encrypted,
+which immediately raises the question of how to search EHRs efficiently
+and securely.
 
-YOUR CONCLUSION HERE.
+A lot of developments have taken place in this line of study over the
+past decade and research continues in the uncharted areas that are not
+covered by the techniques currently in existence.
 
 % References
 \clearpage
