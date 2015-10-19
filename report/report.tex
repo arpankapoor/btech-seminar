@@ -81,6 +81,17 @@ A private-key encryption scheme is a set of three polynomial-time algorithms
 \begin{definition}[Pseudorandom Function]
 A polynomial-time computable function that cannot be distinguished from random
 functions by any probabilistic polynomial-time adversary.
+
+\noindent A funtion \(F \colon \{0,1\}^n \times \{0,1\}^s \rightarrow \{0,1\}^m\)
+is a PRF if
+\begin{itemize}
+\item Given a key \(K\in\{0,1\}^s\) and an input \(X\in\{0,1\}^n\) there is an
+	\emph{efficient} algorithm to compute \(F_K(X) = F(X, K)\).
+\item \(F_K(i)\) is indistinguishable from a random function, that is,
+	given any \(x_1,\dotsc,x_m\), \(F_K(x_1),\dotsc,F_K(x_m)\), no
+	adversary can predict \(F_K(x_{m+1})\) for any \(x_{m+1}\).
+\end{itemize}
+
 \end{definition}
 
 
