@@ -1,0 +1,1429 @@
+Dynamic Searchable Symmetric Encryption
+Seny Kamara
+
+Charalampos Papamanthou∗
+
+Tom Roeder
+
+Microsoft Research
+
+UC Berkeley
+
+Microsoft Research
+
+senyk@microsoft.com
+
+cpap@cs.berkeley.edu
+
+throeder@microsoft.com
+
+ABSTRACT
+
+Keywords
+
+Searchable symmetric encryption (SSE) allows a client to
+encrypt its data in such a way that this data can still be
+searched. The most immediate application of SSE is to cloud
+storage, where it enables a client to securely outsource its
+data to an untrusted cloud provider without sacrificing the
+ability to search over it.
+SSE has been the focus of active research and a multitude
+of schemes that achieve various levels of security and efficiency have been proposed. Any practical SSE scheme, however, should (at a minimum) satisfy the following properties: sublinear search time, security against adaptive chosenkeyword attacks, compact indexes and the ability to add and
+delete files efficiently. Unfortunately, none of the previouslyknown SSE constructions achieve all these properties at the
+same time. This severely limits the practical value of SSE
+and decreases its chance of deployment in real-world cloud
+storage systems.
+To address this, we propose the first SSE scheme to satisfy
+all the properties outlined above. Our construction extends
+the inverted index approach (Curtmola et al., CCS 2006 ) in
+several non-trivial ways and introduces new techniques for
+the design of SSE. In addition, we implement our scheme
+and conduct a performance evaluation, showing that our
+approach is highly efficient and ready for deployment.
+
+Searchable symmetric encryption, cloud computing, cloud
+storage
+
+1. INTRODUCTION
+Searchable symmetric encryption (SSE) allows a client to
+encrypt data in such a way that it can later generate search
+tokens to send as queries to a storage server. Given a token,
+the server can search over the encrypted data and return
+the appropriate encrypted files. Informally, a SSE scheme
+is secure if: (1) the ciphertext alone reveals no information
+about the data; (2) the ciphertext together with a search
+token reveals at most the result of the search; (3) search
+tokens can only be generated using the secret key.
+The most immediate application of SSE is to the design
+of searchable cryptographic cloud storage systems (see [19]
+for a discussion) which can provide end-to-end security for
+cloud storage systems without sacrificing utility. Other applications include the design of graph encryption schemes
+and controlled disclosure mechanisms [6].
+In an index-based SSE scheme [15, 5, 8, 23, 6] the encryption algorithm takes as input an index δ and a sequence of
+n files f = (f1 , . . . , fn ) and outputs an encrypted index γ
+and a sequence of n ciphertexts c = (c1 , . . . , cn ). All known
+constructions [15, 5, 8, 23, 6] can encrypt the files f using
+any symmetric encryption scheme, i.e., the file encryption
+does not depend on any unusual properties of the encryption scheme.
+To search for a keyword w, the client generates a search
+token τw and given τw , γ and c, the server can find the identifiers Iw of the files that contain w. From these identifiers it
+can recover the appropriate ciphertexts cw .1 Notice that the
+provider learns some limited information about the client’s
+query. In particular, it knows that whatever keyword is being searched for is contained in the files encrypted as cw .
+There are ways to hide even this information, most notably
+using the work of Goldreich and Ostrovsky [16] on oblivious
+RAMs, but such an approach leads to inefficient schemes.
+Previous work. The problem of searching on symmetrically encrypted data can be solved in its full generality
+using the work of Goldreich and Ostrovsky [16] on oblivious RAMs. Unfortunately, this approach requires interaction and has a high overhead. Searchable encryption was
+first considered explicitly by Song, Wagner and Perrig in
+
+Categories and Subject Descriptors
+E.3 [Data Encryption]; E.5 [Files]: Sorting/searching;
+H.3.3 [Information Storage and Retrieval]: Information Storage and Retrieval
+
+General Terms
+Algorithms, Security, Theory
+∗
+
+Work done at Microsoft Research.
+
+Permission to make digital or hard copies of all or part of this work for
+personal or classroom use is granted without fee provided that copies are
+not made or distributed for profit or commercial advantage and that copies
+bear this notice and the full citation on the first page. To copy otherwise, to
+republish, to post on servers or to redistribute to lists, requires prior specific
+permission and/or a fee.
+CCS’12, October 16–18, 2012, Raleigh, North Carolina, USA.
+Copyright 2012 ACM 978-1-4503-1651-4/12/10 ...$15.00.
+
+1
+
+This is the structure-only formulation of SSE. We refer the
+reader to [6] for a discussion of other SSE formulations in
+the more general setting of structured encryption.
+
+965
+
+Scheme
+SWP00 [22]
+Z-IDX [15]
+CM05 [5]
+SSE-1 [8]
+SSE-2 [8]
+vSDHJ10 [23]
+CK10 [6]
+KO12 [21]
+this paper
+
+Dynamism
+static
+dynamic
+static
+static
+static
+dynamic
+static
+static
+dynamic
+
+Security
+CPA
+CKA1
+CKA1
+CKA1
+CKA2
+CKA2
+CKA2
+UC
+CKA2
+
+Search time
+O(|f |)
+O(#f )
+O(#f )
+O(#fw )
+O(#f )
+O(log #W )
+O(#fw )
+O(#f )
+O(#fw )
+
+Index size
+N/A
+O(#f )
+O(#f · #W )
+P
+O( w #fw + #W )
+O(#f · #W )
+O(#W · mf )
+O(#W · mf )
+O(#W · #f )
+P
+O( w #fw + #W )
+
+Table 1: Comparison of several SSE schemes. Search time is per keyword w and update time is per file f . f
+is the file collection, |f | is its bit length, #f is the number of files in f , #fw is the number of files that contain
+the keyword w, #W is the size of the keyword space and mf is the maximum (over keywords) number of files
+in which a keyword appears.
+Table 1 summarizes the differences between our scheme
+and others that have appeared in the literature.
+Our contributions. In this work, we focus on the problem of constructing practical SSE schemes for the purpose
+of designing practical searchable cryptographic cloud storage systems [19]. We make the following contributions:
+
+[22], where they give a non-interactive solution that achieves
+search time that is linear in the length of the file collection.
+Formal security notions for SSE have evolved over time.
+The first notion, security against chosen-keyword attacks
+(CKA1) [15, 5, 8], guarantees that: (1) the encrypted index γ and the ciphertexts c do not reveal any information
+about f other than the number of files n and their length;
+and (2) the encrypted index γ and a token τw reveal at
+most the outcome of the search Iw . It was observed in
+[8], however, that CKA1-security only provides security if
+the search queries are independent of (γ, c) and of previous
+search results. To address this, the stronger notion of adaptive security against chosen-keyword attacks (CKA2) was
+proposed [8]. Recently, Kurosawa and Ohtaki put forth the
+even stronger notion of universally composable (UC) SSE
+[21] that, roughly speaking, guarantees security even when
+the scheme is used in arbitrary environments (e.g., when
+composed with itself and/or other cryptographic protocols
+and primitives).
+While there are several CKA2-secure SSE schemes [8, 23,
+6, 21], they all have limitations from a practical point of
+view. In particular, the constructions of [8] and [21] require O(#f ) time to search, where #f denotes the number
+of files in the collection. While the construction from [6]
+is asymptotically optimal and efficient in practice, the encrypted index can be very large. In addition, none of these
+three schemes are explicitly dynamic; that is, one cannot add
+or remove files without either re-indexing the entire data collection or making use of generic and relatively expensive dynamization techniques like the one used in [8]. As far as we
+know, the only SSE construction that is CKA2-secure and
+(explicitly) dynamic was proposed by van Liesdonk, Sedghi,
+Doumen, Hartel and Jonker [23]. In their scheme, search
+is logarithmic in the number of keywords which, for practical purposes, is likely to be efficient enough. The main
+limitations of the scheme, however, are that the size of the
+encrypted index is relatively large (roughly the same as the
+scheme from [6]).
+Another line of work uses deterministic encryption [2, 1]
+to enable search on encrypted data with existing database
+and search techniques. This approach differs from SSE as it
+only provides security for data and queries that have high
+entropy. Starting with the work of Boneh, Di Crescenzo,
+Ostrovsky and Persiano [4], searchable encryption has also
+been considered in the public-key setting.
+
+1. We present a formal security definition for dynamic
+SSE. In particular, our definition captures a strong
+notion of security for SSE, which is adaptive security
+against chosen-keyword attacks (CKA2) [8].
+2. We construct the first SSE scheme that is dynamic,
+CKA2-secure and achieves optimal search time. We
+note that, unlike previously known schemes [22, 15, 5,
+8, 6], our construction is secure in the random oracle
+model.
+3. We describe the first implementation and evaluation of
+an SSE scheme based on the inverted index approach
+of [8]. Our implementation shows that this type of SSE
+scheme can be extremely efficient.
+4. We conduct a performance evaluation of our scheme
+that shows the incremental cost of adding confidentiality to a (searchable) cloud storage system.
+
+2. PRELIMINARIES AND NOTATION
+The set of all binary strings of length n is denoted as
+{0, 1}n , and the set of all finite binary strings as {0, 1}∗ .
+The notation [n] represents the set of integers {1, . . . , n}.
+We write x ← χ to represent an element x being sampled
+$
+from a distribution χ, and x ← X to represent an element
+x being sampled uniformly at random from a set X. The
+output x of a probabilistic algorithm A is denoted by x ← A
+and that of a deterministic algorithm B by x := B. Given
+a sequence of elements v we refer to its ith element either
+as vi or v[i] and to its total number of elements as #v. If
+S is a set then #S refers to its cardinality. W denotes the
+universe of words. If f = (w1 , . . . , wm ) ∈ W m is a file, then
+#f denotes its total number of words and |f | is its bit length.
+Also, f¯ is the file that results from removing all duplicates
+from f (i.e., f¯ contains only the unique words in f sequenced
+according to the order in which they first appear in f ). If
+s is a string then |s| refers to its bit length. We denote the
+concatenation of n strings s1 , . . . , sn by hs1 , . . . , sn i.
+
+966
+
+We use various data structures including linked lists, arrays and dictionaries. If L is a list then #L denotes its total
+number of nodes. If A is an array then #A is its total number of cells, A[i] is the value stored at location i ∈ [#A] and
+A[i] := v denotes the operation that stores v at location i
+in A. A dictionary (also known as a key-value store or associative array) is a data structure that stores key-value pairs
+(s, v). If the pair (s, v) is in T, then T[s] is the value v associated with s. T[s] := v denotes the operation that stores
+the value v under search key s in T and #T is the number
+of pairs in T. We sometimes write s ∈ T to mean that there
+exists some pair in T with search key s.
+Throughout, k ∈ N will denote the security parameter
+and we will assume all algorithms take k implicitly as input. A function ν : N → N is negligible in k if for every
+positive polynomial p(·) and all sufficiently large k, ν(k) <
+1/p(k). We write f (k) = poly(k) to mean that there exists a polynomial p(·) such that f (k) ≤ p(k) for all sufficiently large k ∈ N; and we similarly write f (k) = negl(k)
+to mean that there exists a negligible function ν(·) such
+that f (k) ≤ ν(k) for all sufficiently large k. Two distribution ensembles χ and χ′ are computationally indistinguishable if for all probabilistic polynomial-time (PPT) distinguishers D, |Pr [ D(χ) = 1 ] − Pr [ D(χ′ ) = 1 ]| ≤ negl(k).
+Basic cryptographic primitives. A private-key encryption scheme is a set of three polynomial-time algorithms
+SKE = (Gen, Enc, Dec) such that Gen is a probabilistic algorithm that takes a security parameter k and returns a
+secret key K; Enc is a probabilistic algorithm takes a key K
+and a message m and returns a ciphertext c; Dec is a deterministic algorithm that takes a key K and a ciphertext c
+and returns m if K was the key under which c was produced.
+Informally, a private-key encryption scheme is CPA-secure
+if the ciphertexts it outputs do not reveal any partial information about the plaintext even to an adversary that can
+adaptively query an encryption oracle.
+In addition to encryption schemes, we also make use of
+pseudo-random functions (PRF) and permutations (PRP),
+which are polynomial-time computable functions that cannot be distinguished from random functions by any probabilistic polynomial-time adversary. We refer the reader to
+[20] for formal definitions of CPA-security, PRFs and PRPs.
+
+3.
+
+the same keyword. This means that searches leak statistical information about the user’s search pattern. Currently,
+it is not known how to design efficient SSE schemes with
+probabilistic trapdoors.
+Recall that we consider dynamic SSE so the scheme must
+allow for the addition and removal of files. Both of these
+operations are handled using tokens. To add a file f , the
+client generates an add token τa and given τa and γ, the
+provider can update the encrypted index γ. Similarly, to
+delete a file f , the client generates a delete token τd , which
+the provider uses to update γ.
+Definition 3.1 (Dynamic SSE). A dynamic index-based
+SSE scheme is a tuple of nine polynomial-time algorithms
+SSE = (Gen, Enc, SrchToken, AddToken, DelToken, Search, Add,
+Del, Dec) such that:
+K ← Gen(1k ): is a probabilistic algorithm that takes
+as input a security parameter k and outputs a secret
+key K.
+(γ, c) ← Enc(K, f ): is a probabilistic algorithm that
+takes as input a secret key K and a sequence of files
+f . It outputs an encrypted index γ, and a sequence of
+ciphertexts c.
+τs ← SrchToken(K, w): is a (possibly probabilistic) algorithm that takes as input a secret key K and a keyword w. It outputs a search token τs .
+(τa , cf ) ← AddToken(K, f ): is a (possibly probabilistic)
+algorithm that takes as input a secret key K and a file
+f . It outputs an add token τa and a ciphertext cf .
+τd ← DelToken(K, f ): is a (possibly probabilistic) algorithm that takes as input a secret key K and a file
+f . It outputs a delete token τd .
+Iw := Search(γ, c, τs ): is a deterministic algorithm that
+takes as input an encrypted index γ, a sequence of ciphertexts c and a search token τs . It outputs a sequence
+of identifiers Iw ⊆ c.
+(γ ′ , c′ ) := Add(γ, c, τa , c): is a deterministic algorithm
+that takes as input an encrypted index γ, a sequence
+of ciphertexts c, an add token τa and a ciphertext c.
+It outputs a new encrypted index γ ′ and sequence of
+ciphertexts c′ .
+
+DEFINITIONS
+
+Recall from §1 that searchable encryption allows a client
+to encrypt data in such a way that it can later generate
+search tokens to send as queries to a storage server. Given a
+search token, the server can search over the encrypted data
+and return the appropriate encrypted files.
+The data can be viewed as a sequence of n files f =
+(f1 , . . . , fn ), where file fi is a sequence of words (w1 , . . . , wm )
+from a universe W . We assume that each file has a unique
+identifier id(fi ). The data is dynamic, so at any time a file
+may be added or removed. We note that the files do not
+have to be text files but can be any type of data as long as
+there exists an efficient algorithm that maps each document
+to a file of keywords from W . Given a keyword w we denote
+by fw the set of files in f that contain w. If c = (c1 , . . . , cn )
+is a set of encryptions of the files in f , then cw refers to the
+ciphertexts that are encryptions of the files in fw .
+A limitation of all known SSE constructions (including
+ours) is that the tokens they generate are deterministic, in
+the sense that the same token will always be generated for
+
+(γ ′ , c′ ) := Del(γ, c, τd ): is a deterministic algorithm
+that takes as input an encrypted index γ, a sequence of
+ciphertexts c, and a delete token τd . It outputs a new
+encrypted index γ ′ and new sequence of ciphertexts c′ .
+f := Dec(K, c): is a deterministic algorithm that takes
+as input a secret key K and a ciphertext c and outputs
+a file f .
+A dynamic SSE scheme is correct if for all k ∈ N, for all
+keys K generated by Gen(1k ), for all f , for all (γ, c) output
+by Enc(K, f ), and for all sequences of add, delete or search
+operations on γ, search always returns the correct set of
+indices.
+Intuitively, the security guarantee we require from a dynamic SSE scheme is that (1) given an encrypted index γ
+and a sequence of ciphertexts c, no adversary can learn any
+
+967
+
+Note that in addition to our inclusion of dynamic operations the differences between our definitions and the definitions of [8] are stylistic: we employ leakage functions in the
+style of [6] rather than the history in the style of [8].
+
+partial information about the files f ; and that (2) given, in
+addition, a sequence of tokens τ = (τ1 , . . . , τn ) for an adaptively generated sequence of queries q = (q1 , . . . , qn ) (which
+can be for the search, add or delete operations), no adversary
+can learn any partial information about either f or q.
+This exact intuition can be difficult to achieve and most
+known efficient and non-interactive SSE schemes [15, 5, 8]
+reveal the access and search patterns.2 We therefore need
+to weaken the definition appropriately by allowing some limited information about the messages and the queries to be
+revealed to the adversary. To capture this, we follow the approach of [8] and [6] and parameterize our definition with a
+set of leakage functions that capture precisely what is being
+leaked by the ciphertext and the tokens.
+As observed in [8], another issue with respect to SSE security is whether the scheme is secure against adaptive chosenkeyword attacks (CKA2) or only against non-adaptive chosen keyword attacks (CKA1). The former guarantees security even when the client’s queries are based on the encrypted index and the results of previous queries. The latter only only guarantees security if the client’s queries are
+independent of the index and of previous results.
+In the following definition, we extend the notion of CKA2security from [8] to the dynamic setting.
+
+4. OUR CONSTRUCTION
+Our scheme is an extension of the SSE-1 construction from
+[8, 9] which is based on the inverted index data structure.
+Though SSE-1 is practical (it is asymptotically optimal with
+small constants), it does have limitations that make it unsuitable for direct use in cryptographic cloud storage systems: (1) it is only secure against non-adaptive chosenkeyword attacks (CKA1) which, intuitively, means that it
+can only provide security for clients that perform searches
+in a batch; and (2) it is not explicitly dynamic, i.e., it can
+only support dynamic operations using general and inefficient techniques.
+Before discussing how we address these issues, we first
+recall a variant of the SSE-1 construction at a high level.
+The construction is essentially the same as SSE-1 except that
+the lookup table managed by indirect addressing is replaced
+with a dictionary 3 . The scheme makes use of a privatekey encryption scheme SKE = (Gen, Enc, Dec), two pseudorandom functions F and G, an array As we refer to as the
+search array and a dictionary Ts we refer to as the search
+table. Here we assume SKE is anonymous in the sense that,
+given two ciphertexts, one cannot determine whether they
+were encrypted unders the same key 4 .
+The SSE-1 construction. To encrypt a collection of files
+f , the scheme constructs for each keyword w ∈ W a list Lw .
+Each list Lw is composed of #fw nodes (N1 , . . . , N#fw ) that
+are stored at random locations in the search array As . The
+node Ni is defined as Ni = hid, addrs (Ni+1 )i, where id is the
+unique file identifier of a file that contains w and addrs (N)
+denotes the location of node N in As . To prevent the size
+of As from revealing statistical information about f , it is
+recommended that As be of size at least |c|/8 and the unused
+cells be padded with random strings of appropriate length.
+For each keyword w, a pointer to the head of Lw is then
+inserted into the search table Ts under search key FK1 (w),
+where K1 is the key to the PRF F . Each list is then encrypted using SKE under a key generated as GK2 (w), where
+K2 is the key to the PRF G.
+To search for a keyword w, it suffices for the client to send
+the values FK1 (w) and GK2 (w). The server can then use
+FK1 (w) with Ts to recover the pointer to the head of Lw , and
+use GK2 (w) to decrypt the list and recover the identifiers of
+the files that contain w. As long as T supports O(1) lookups
+(which can be achieved using a hash table), the total search
+time for the server is linear in #fw , which is optimal.
+Making SSE-1 dynamic. As mentioned above, the limitations of SSE-1 are twofold: (1) it is only CKA1-secure
+and (2) it is not explicitly dynamic. As observed in [6], the
+first limitation can be addressed relatively easily by requiring that SKE be non-committing (in fact the CKA2-secure
+SSE construction proposed in that work uses a simple PRFbased non-committing encryption scheme).
+The second limitation, however, is less straightforward to
+
+Definition 3.2 (Dynamic CKA2-security). Let SSE
+= (Gen, Enc, SrchToken, AddToken, DelToken, Search, Add, Del,
+Dec) be a dynamic index-based SSE scheme and consider the
+following probabilistic experiments, where A is a stateful adversary, S is a stateful simulator and L1 , L2 , L3 and L4 are
+stateful leakage algorithms:
+RealA (k): the challenger runs Gen(1k ) to generate a key
+K. A outputs f and receives (γ, c) such that (γ, c) ←
+EncK (f ) from the challenger. The adversary makes
+a polynomial number of adaptive queries {w, f1 , f2 }
+and, for each query q, receives from the challenger either a search token τs such that τs ← SrchTokenK (w),
+an add token and ciphertext pair (τa , cf1 ) such that
+(τa , cf1 ) ← AddTokenK (f1 ) or a delete token τd such
+that τd ← DelTokenK (f2 ). Finally, A returns a bit b
+that is output by the experiment.
+IdealA,S (k): A outputs f . Given L1 (f ), S generates and
+sends a pair (γ, c) to A. The adversary makes a polynomial number of adaptive queries q ∈ {w, f1 , f2 } and,
+for each query q, the simulator is given either L2 (f , w),
+L3 (f , f1 ) or L4 (f , f2 ). The simulator returns an appropriate token τ and, in the case of an add operation, a
+ciphertext c. Finally, A returns a bit b that is output
+by the experiment.
+We say that SSE is (L1 , L2 , L3 , L4 )-secure against adaptive
+dynamic chosen-keyword attacks if for all ppt adversaries
+A, there exists a ppt simulator S such that
+|Pr [ RealA (k) = 1 ] − Pr [ IdealA,S (k) = 1 ]| ≤ negl(k).
+
+3
+This was first used in [6] to avoid the use of FKS dictionaries [14].
+4
+This allows us to encrypt each node of a list using a single
+key as opposed to using unique keys as done in [8].
+
+2
+Two exceptions are the work of Goldreich and Ostrovsky
+[16] which does not leak any information at all, and the SSE
+construction described in [6] which leaks only the access and
+the intersection patterns.
+
+968
+
+Index
+w1
+
+w2
+
+w3
+
+f1
+
+f2
+
+f3
+
+f2
+
+f2
+
+Search Table Ts
+
+Deletion Table Td
+
+FK1 (w1 ) −→ (4 || 1) ⊕ GK2 (w1 )
+
+FK1 (f1 ) −→ 1 ⊕ GK2 (f1 )
+
+FK1 (w2 ) −→ (0 || 2) ⊕ GK2 (w2 )
+
+FK1 (f2 ) −→ 5 ⊕ GK2 (f2 )
+
+FK1 (w3 ) −→ (5 || 0) ⊕ GK2 (w3 )
+
+FK1 (f3 ) −→ 4 ⊕ GK2 (f3 )
+
+free −→ 6
+
+f3
+0
+
+1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+7
+
+w2
+f2
+
+w3
+f3
+
+free
+Ad [7]
+
+w1
+f3
+
+w1
+f1
+
+w3
+f2
+
+free
+Ad [3]
+
+w1
+f2
+
+f2
+
+f1
+
+f2
+
+w3
+
+w1
+
+w2
+
+0
+
+f3
+
+f2
+
+f3
+
+w3
+
+w1
+
+w1
+
+0
+
+Search Array As
+
+Deletion Array Ad
+
+Figure 1: A small example of a dynamic encrypted index.
+overcome. The difficulty is that the addition, deletion or
+modification of a file requires the server to add, delete or
+modify nodes in the encrypted lists stored in As . This is
+difficult for the server to do since: (1) upon deletion of a file
+f , it does not know where (in A) the nodes corresponding to
+f are stored; (2) upon insertion or deletion of a node from a
+list, it cannot modify the pointer of the previous node since
+it is encrypted; and (3) upon addition of a node, it does not
+know which locations in As are free.
+At a high level, we address these limitations as follows:
+
+tions in As are free we add and manage extra space
+comprising a free list that the server uses to add new
+nodes.
+Our construction is described in detail in Figures 2 and
+3. Figure 1, which we discuss in the next Section, illustrates
+the dynamic SSE data structures over a toy index containing
+3 files and 3 unique words.
+
+4.1 An Illustrative Example
+In Figure 1, we show the data structures of our fullydynamic SSE scheme for a specific index. The index is built
+on three documents, namely f1 , f2 , f3 over three keywords,
+namely w1 , w2 , w3 . All the documents contain keyword w1 ,
+keyword w2 is only contained in document f2 and w3 is
+contained in documents f2 and f3 . The respective search
+table Ts , the deletion table Td , the search array As and the
+deletion array Ad are also shown in Figure 1. Note that in a
+real DSSE index, there would be padding to hide the number
+of file-word pairs; we omit this padding for simplicity in this
+example.
+Searching. Searching is the simplest operation in our
+scheme. Suppose the client wishes to search for all the documents that contain keyword w1 . He prepares the search
+token, which among others contains FK1 (w1 ) and GK2 (w1 ).
+The first value FK1 (w1 ) will enable the server to locate the
+entry corresponding to keyword w1 in the search table Ts . In
+our example, this value is x = (4||1) ⊕ GK2 (w1 ). The server
+now uses the second value GK2 (w1 ) to compute x⊕GK2 (w1 ).
+This will allow the server to locate the right entry (4 in our
+example) in the search array and begin “unmasking” the
+locations storing pointers to the documents containing w1 .
+This unmasking is performed by means of the third value
+contained in the search token.
+Adding a document. Suppose now the client wishes to
+add a document f4 containing keywords w1 and w2 . Note
+that the search table does not change at all since f4 is going
+
+1. (file deletion) we add an extra (encrypted) data structure Ad called the deletion array that the server can
+query (with a token provided by the client) to recover
+pointers to the nodes that correspond to the file being
+deleted. More precisely, the deletion array stores for
+each file f a list Lf of nodes that point to the nodes
+in As that should be deleted if file f is ever removed.
+So every node in the search array has a corresponding node in the deletion array and every node in the
+deletion array points to a node in the search array.
+Throughout, we will refer to such nodes as duals and
+write N⋆ to refer to the dual of a node N.
+2. (pointer modification) we encrypt the pointers stored
+in a node with a homomorphic encryption scheme.
+This is similar to the approach used by van Liesdonk et
+al in [23] to modify the encrypted search structure they
+construct. By providing the server with an encryption
+of an appropriate value, it can then modify the pointer
+without ever having to decrypt the node. We use the
+“standard” private-key encryption scheme which consists of XORing the message with the output of a PRF.
+This simple construction also has the advantage of being non-committing (in the private-key setting) which
+we make use of to achieve CKA2-security.
+3. (memory management) to keep track of which loca-
+
+969
+
+Let SKE = (Gen, Enc, Dec) be a private-key encryption scheme and F : {0, 1}k × {0, 1}∗ → {0, 1}k , G : {0, 1}k × {0, 1}∗ → {0, 1}∗ ,
+and P : {0, 1}k × {0, 1}∗ → {0, 1}k be pseudo-random functions. Let H1 : {0, 1}∗ → {0, 1}∗ and H2 : {0, 1}∗ →
+{0, 1}∗ be random oracles. Let z ∈ N be the initial size of the free list. Construct a dynamic SSE scheme SSE =
+(Gen, Enc, SrchToken, AddToken, DelToken, Search, Add, Del, Dec) as follows:
+• Gen(1k ): sample three k-bit strings K1 , K2 , K3 uniformly at random and generate K4 ← SSE.Gen(1k ). Output K =
+(K1 , K2 , K3 , K4 ).
+• Enc(K, f ):
+1. let As and Ad be arrays of size |c|/8 + z and let Ts and Td be dictionary of size #W and #f , respectively. We assume
+0 is a (log #As )-length string of 0’s and that free is a word not in W .
+2. for each word w ∈ W ,a
+(a) create a list Lw of #fw nodes (N1 , . . . , N#fw ) stored at random locations in the search array As and defined as:
+Ni := (hidi , addrs (Ni+1 )i ⊕ H1 (Kw , ri ), ri ) where idi is the ID of the ith file in fw , ri is a k-bit string generated
+uniformly at random, Kw := PK3 (w) and addrs (N#fw +1 ) = 0
+(b) store a pointer to the first node of Lw in the search table by setting Ts [FK1 (w)] := haddr s (N1 ), addrd (N⋆1 )i⊕GK2 (w),
+where N⋆ is the dual of N, i.e., the node in Ad whose fourth entry points to N1 in As .
+3. for each file f in f ,
+(a) create a list Lf of #f¯ dual nodes (D1 , . . . , D#f¯) stored at random locations in the deletion array Ad and defined as
+follows: each entry Di is associated with a word w, and hence a node N in Lw . Let N+1 be the node following N in
+Lw , and N−1 the node previous to N in Lw . Then, define Di as follows: Di := (haddr d (Di+1 ), addrd (N⋆−1 ), addrd (N⋆+1 ),
+addrs (N), addrs (N−1 ), addrs (N+1 ), FK1 (w) i ⊕ H2 (Kf , ri′ ), ri′ ) where ri′ is a k-bit string generated uniformly at
+random, Kf := PK3 (f ), and addrd (D#f¯+1 ) = 0.
+(b) store a pointer to the first node of Lf in the deletion table by setting: Td [FK1 (f )] := addrd (D1 ) ⊕ GK2 (f )
+4. create an unencrypted free list Lfree by choosing z unused cells at random in As and in Ad . Let (F1 , . . . , Fz ) and
+(F′1 , . . . , F′z ) be the free nodes in As and Ad , respectively. Set Ts [free] := haddrs (Fz ), 0log #A i and for z ≤ i ≤ 1, set
+As [addrs (Fi )] := 0log #f , addrs (Fi−1 ), addrd (F′i ) where addrs (F0 ) = 0log #A .
+5. fill the remaining entries of As and Ad with random strings
+6. for 1 ≤ i ≤ #f , let ci ← SKE.EncK4 (fi )
+7. output (γ, c), where γ := (As , Ts , Ad , Td ) and c = (c1 , . . . , c#f ).
+
+• SrchToken(K, w): compute and output τs := FK1 (w), GK2 (w), PK3 (w)
+• Search(γ, c, τs ):
+1. parse τs as (τ1 , τ2 , τ3 ) and return an empty list if τ1 is not present in Ts .
+2. recover a pointer to the first node of the list by computing (α1 , α′1 ) := Ts [τ1 ] ⊕ τ2
+3. look up N1 := A[α1 ] and decrypt with τ3 , i.e., parse N1 as (ν1 , r1 ) and compute (id1 , 0, addrs (N2 )) := ν1 ⊕ H1 (τ3 , r1 )
+4. for i ≥ 2, decrypt node Ni as above until αi+1 = 0
+5. let I = {id1 , . . . , idm } be the file identifiers revealed in the previous steps and output {ci }i∈I , i.e., the encryptions of
+the files whose identifiers were revealed.
+• AddToken(K, f ): let (w1 , . . . , w#f¯) be the unique words in f in their order of appearance in f . Compute τa := (
+FK1 (f ), GK2 (f ), λ1 , . . . , λ#f¯), where for all 1 ≤ i ≤ #f¯: λi := (FK1 (wi ), GK2 (wi ), hid(f ), 0i ⊕H1 (PK3 (wi ), ri ), ri ,
+h0, 0, 0, 0, 0, 0, FK1 (wi )i ⊕H2 (PK3 (f ), ri′ ), ri′ ), and ri and ri′ are random k-bit strings. Let cf ← SKE.EncK4 (f ) and output
+(τa , cf ).
+• Add(γ, c, τa ):
+1. parse τa as (τ1 , τ2 , λ1 , . . . , λ#f¯, c) and return ⊥ if τ1 is not in Td .
+2. for 1 ≤ i ≤ #f¯,
+(a) find the last free location ϕ in the search array and its corresponding entry ϕ⋆ in the deletion array by computing
+(ϕ, 0) := Ts [free], and (ϕ−1 , ϕ⋆ ) := As [ϕ].
+(b) update the search table to point to the second to last free entry by setting Ts [free] := (ϕ−1 , 0)
+(c) recover a pointer to the first node N1 of the list by computing (α1 , α⋆1 ) := Ts [λi [1]] ⊕ λi [2]
+
+(d) store the new node at location ϕ and modify its forward pointer to N1 by setting As [ϕ] := λi [3] ⊕ h0, α1 i, λi [4]
+⋆
+(e) update the search table by setting Ts [λi [1]] := (ϕ, ϕ ) ⊕ λi [2]
+
+(f) update the dual of N1 by setting Ad [α⋆1 ] := D1 ⊕ h0, ϕ⋆ , 0, 0, ϕ, 0, 0i, r , where (D1 , r) := Ad [α⋆1 ]
+
+(g) update the dual of As [ϕ] by setting Ad [ϕ⋆ ] := λi [5] ⊕ hϕ⋆−1 , 0, α⋆1 , ϕ, 0, α1 , λi [1]i, λi [6] ,
+(h) if i = 1, update the deletion table by setting Td [τ1 ] := hϕ⋆ , 0i ⊕ τ2 .
+3. update the ciphertexts by adding c to c
+a
+
+Steps 2 and 3 here must be performed in an interleaved fashion to set up As and Ad at the same time.
+Figure 2: A Fully Dynamic SSE scheme (Part 1).
+
+970
+
+• DelToken(K, f ): output: τd := (FK1 (f ), GK2 (f ), PK3 (f ), id(f )).
+• Del(γ, c, τd ):
+1. parse τd as (τ1 , τ2 , τ3 , id) and return ⊥ if τ1 is not in Td
+2. find the first node of Lf by computing α′1 := Td [τ1 ] ⊕ τ2
+3. for 1 ≤ i ≤ #f¯,
+(a) decrypt Di by computing (α1 , . . . , α6 , µ) := Di ⊕ H2 (τ3 , r), where (Di , r) := Ad [α′i ]
+(b) delete Di by setting Ad [α′i ] to a random (6 log #A + k)-bit string
+(c)
+(d)
+(e)
+(f)
+
+find address of last free node by computing (ϕ, 0log #A ) := Ts [free]
+make the free entry in the search table point to Di ’s dual by setting Ts [free] := hα4 , 0log #A i
+free location of Di ’s dual by setting As [α4 ] := (ϕ, α′i )
+let N−1 be the node that precedes Di ’s dual. Update N−1 ’s “next pointer” by setting: As [α5 ] := (β1 , β2 ⊕α4 ⊕α6 , r−1 ),
+where (β1 , β2 , r−1 ) := As [α5 ]. Also, update the pointers of N−1 ’s dual by setting Ad [α2 ] := (β1 , β2 , β3 ⊕ α′i ⊕
+∗ ), where (β , . . . , β , µ∗ , r ∗ ) := A [α ]
+α3 , β4 , β5 , β6 ⊕ α4 ⊕ α6 , µ∗, r−1
+1
+6
+d 2
+−1
+
+(g) let N+1 be the node that follows Di ’s dual. Update N+1 ’s dual pointers by setting: Ad [α3 ] := (β1 , β2 ⊕ α′i ⊕
+∗ ), where (β , . . . , β , µ∗ , r ∗ ) := A [α ]
+α2 , β3 , β4 , β5 ⊕ α4 ⊕ α5 , β6 , µ∗ , r+1
+1
+6
+d 3
++1
+(h) set α′i+1 := α1
+4. remove the ciphertext that corresponds to id from c
+5. remove τ1 from Td
+• Dec(K, c): output m := SKE.DecK4 (c).
+
+Figure 3: A Fully Dynamic SSE scheme (Part 2).
+the keyword list w1 and w3 to point to the new entries (in
+our example, to the end of the lists—generally in the next
+pointers of the deleted items). Note that no such an update
+of pointers is required for the deletion array.
+
+to be the last entry in the list of keywords w1 and w2 and
+the search table only stores the first entries. However all
+the other data structures must be updated in the following
+way. First the server uses free to quickly retrieve the indices
+of the “free” positions in the search array As , where the new
+entries are going to be stored. In our example these positions
+are 2 and 6. The server stores in these entries the new
+information (w1 , f4 ) and (w2 , f4 ). Now the server needs to
+connect this new entries to the respective keywords lists:
+using the add token, it retrieves the indices i = 0 and j = 3
+in the search array As of the elements x and y such that x and
+y correspond to the last entries of the keyword lists w1 and
+w2 . In this way the server homomorphically sets As [0]’s and
+As [3]’s “next” pointers to point to the newly added nodes,
+already stored in the search array at positions 2 and 6.
+Note that getting access to the free entries in the search
+array also provides access to the respective free positions
+of the deletion array Ad . In our example, the indices of
+the free positions in the deletion array are 3 and 7. The
+server will store the new entries (f4 , w1 ) and (f4 , w2 ) at these
+positions in the deletion array and will also connect them
+with pointers. Finally, the server will update the deletion
+table by setting the entry FK1 (f4 ) to point to position 3 in
+the deletion array, so that file f4 could be easily retrieved
+for deletion later.
+Deleting a document. Suppose now the client wants
+to delete a document already stored in our index, say document f3 , containing keywords w1 and w3 . The deletion
+is a “dual operation” to addition. First the server uses the
+value FK1 (f3 ) of the deletion token to locate the right value
+4 ⊕ GK2 (f3 ) in the deletion table. This will allow the server
+to get access to the portion of the remaining data structures
+that need to be updated in a similar fashion with the addition algorithm. Namely it will “free” the positions 4 and 6 in
+the deletion array and positions 1 and 3 in the search array.
+While “freeing” the positions in the search array, it will also
+homomorphically update the pointers of previous entries in
+
+5. SECURITY
+As discussed in §3, all practical SSE schemes leak some
+information. Unfortunately, the extent to which the practical security of SSE is affected by this leakage is not well
+understood and depends greatly on the setting in which SSE
+is used. We are aware of only one concrete attack [18] that
+exploits this leakage and it depends strongly on knowledge
+of previous queries and statistics about the file collection.
+We note, however, that our scheme leaks more than most
+previously-known constructions since it is dynamic and there
+are correlations between the information leaked by its various operations. In the following, we provide a framework
+for describing and comparing the leakage of SSE schemes.
+Based on this framework, we compare the leakage of our
+scheme with the leakage of SSE-1, which is static; and the
+leakage of the scheme proposed in [23], which is dynamic.
+A framework for characterizing leakage. Our approach is to describe leakage in terms of a database containing two tables over word and file identifiers: SSE operations
+write anonymized rows to tables in the database, and an adversary tries to de-anonymize the resulting data. Columns
+in the tables contain identifiers for files and words: each file
+is represented by exactly one identifier, and each word is
+represented by exactly one identifier, but these identifiers
+are chosen at random with respect to files and words. For
+ease of exposition, we will assume that there is a function id
+that produce identifiers for files and words.
+Our scheme writes file-word information into two tables:
+1. the File-Word table (FW), in which each row associates a word identifier with a file identifier.
+2. the Adjacency (Adj) table, in which each row asso-
+
+971
+
+ciates a word identifier and a file identifier with a direction “next” or “prev” and one of the following values:
+(1) another file identifier, or (2) a value ⊥.
+
+reveals the word that is searched but does not reveal the
+identifiers of the files returned, since that information is
+masked in an array of bits, with one bit per file. This can be
+represented by writing a word identifier to the FW table with
+the value ⊥ for the file identifier. Their scheme performs the
+same writes to the FW table for Add and Delete, since each
+Add or Delete operation reveals an identifier for the file and
+reveals the word identifiers by the locations that it modifies
+in their index. However, their scheme never writes adjacency information to the Adj table: it hides all adjacency
+information at the cost of requiring per-word storage and
+communication complexity that is linear in the maximum
+number of files that can be stored in their index.
+Theorem and proof. Before stating our security Theorem, we provide a more formal and concise description of
+our scheme’s leakage:
+
+Each row also contains a timestamp of the time it was written; for simplicity in notation, we do not write the timestamps in the following description. Intuitively, the FW table
+records associations between file and word identifiers; the
+Adj table records adjacency information about files in the
+lists for given words.
+Note that our concrete construction has two different identifiers for a given file: the ciphertext for a file is stored under
+a file pointer that is revealed during the search operation,
+but the file information in the index is stored in Td under the
+output of a pseudo-random function on the file. However,
+the scheme’s operations immediately reveal to an adversary
+the correlation between these values, so in our leakage description, we do not distinguish between these two types
+of file identifiers. Operations in our construction write the
+following values:
+Search takes as input the identifier for a word w and returns a set of file identifiers to the client. So, for each file f
+returned by search, our scheme writes the row (id(w), id(f ))
+to the FW table. Note that the server then writes one row
+for each file-word pair.
+Add takes as input an add token that contains the identifier for a file f and adds word information for a set of words
+associated with this file. Like Search, Add writes tuples
+(id(w), id(f )) for each word w associated with the file in the
+Add Token.
+Additionally, however, the Add operation reveals to the
+server whether or not f is the only file that contains w. If the
+server has previously executed an operation that revealed
+the file f ′ associated with the head of the list for w, then
+Add writes the tuple (id(w), id(f ), “next”, id(f ′ )) to the Adj
+table. In either case, Add writes the tuple (id(w), id(f ),
+“prev”, ⊥) to the Adj table to indicate that f is the head
+node for the list for w. And if the word is not yet in the
+index, then Add writes (id(w), id(f ), “next”, ⊥) to the Adj
+table.
+Delete takes as input a delete token that contains an identifier for a file f ; this token does not contain any wordspecific information. However, in the process of executing
+the Delete operation, the server uncovers in the index a
+word-identifier (the search key for Ts ) for each word associated with the file. So, like Search and Add, Delete writes
+tuples (id(w), id(f )) for each word w associated with f .
+As each word w is deleted for f , it reveals the location
+of its neighbors in the search array. And for the purposes
+of our proof, we say that the leakage in this case consists
+of the file identifiers for the previous and next nodes in the
+list for w. Let the files associated with these nodes be f ′
+and f ′′ , respectively. The server then writes (id(w), id(f ),,
+“prev”, id(f ′ )) and (id(w), id(f ), “next”, id(f ′′ )) to the Adj
+table (in each case, it writes ⊥ if there is no previous or next
+neighbor).
+We can use this framework to compare the leakage of our
+scheme to the leakage of previous schemes. SSE-1 does not
+provide Add or Delete operations, but it writes the same
+values as our scheme writes to the FW table in Search. The
+other table (and the additional writes to FW in Add and
+Delete) makes up the extra leakage from our scheme.
+The scheme of Sedghi et al. [23] is dynamic but leaks less
+information than our construction. Search in their scheme
+
+• the L1 leakage is defined as
+L1 (f ) =
+
+
+
+
+
+  
+#As , id(w) w∈W , id(f ) f ∈f , |f | f ∈f ,
+
+where id is the identifier function described above.
+• the L2 leakage is defined as:
+
+L2 (f , w) = accpt (w), id(w) ,
+where accpt (w) is the access pattern which itself is
+defined as the sequence (id1 , . . . , id#fw ).
+• the L3 leakage is defined as:
+
+
+
+L3 (f , f ) = id(f ), id(w), apprs(w) w∈f¯, |f | ,
+where apprs(wi ) is a bit set to 1 if w is appears in at
+least one file in f and to 0 otherwise.
+• the L4 leakage is defined as:
+L4 (f , f ) =
+
+
+
+id(f ), id(w), prev(f, w), next(f, w) w∈f¯ ,
+where prev(f, w) and next(f, w) are the identities of the
+first files before and after f (in the natural ordering
+of files) that contain w. If there are no files before
+and after f that contain the word then prev(f, w) and
+next(f, w) return ⊥, respectively. Here we assume the
+identifier/pointer triples are ordered according to the
+order in which the words appear in f .
+In the following Theorem, whose proof is omitted due to
+lack of space, we show that our construction is CKA2-secure
+in the random oracle model with respect to the leakage described above.
+Theorem 5.1. If SKE is CPA-secure and if F , G and
+P are pseudo-random, then SSE as described above is (L1 ,
+L2 , L3 , L4 )-secure against adaptive chosen-keyword attacks
+in the random oracle model.
+At a very high level, the proof of security for our construction works as follows. The simulator S generates a
+simulated encrypted index γ
+e and a simulated sequence of ciphertexts e
+c using the information it receives from L1 , which
+includes the number of elements in the search array, the
+number of files, the number of keywords and the length of
+
+972
+
+each file. The simulated index γ
+e can be constructed similarly to a real encrypted index, except that encryptions are
+replaced by encryptions of the zero string (of appropriate
+length) and the output of the PRFs are replaced by random
+values. The CPA-security of the encryption schemes and
+the pseudo-randomness of the PRFs will guarantee that the
+resulting γ
+e is indistinguishable from a real encrypted index. The simulated file encryptions e
+c are simulated in the
+same manner (i.e., replacing the ciphertexts by encryptions
+of the all zero string) and the CPA-security of the encryption
+scheme guarantees indistinguishability.
+Simulating search, add and delete tokens is more complex
+and requires the simulator to keep track of various dependencies between the information revealed by these operations.
+This is because the tokens the simulator creates must all
+be consistent with each other, otherwise the simulation may
+be detected by the adversary. For this, our proof utilizes a
+non-trivial set of techniques so that the simulator can keep
+track of dependencies. Due to lack of space the full proof
+will appear in the full version of this work.
+On our use of random oracles. As observed in [8],
+one of the main difficulties in designing CKA2-secure SSE
+schemes is that the keywords can be chosen as a function
+of the encrypted index and of previous search results. This
+makes proving security difficult because the simulator has
+to be able to simulate an encrypted index before it receives
+any search results. [8] showed how to overcome this obstacle and later [6] gave a more efficient approach based on a
+simple private-key non-committing encryption scheme. At
+a high level, both works construct schemes that allow for
+equivocation, that is, the simulator can generate a “fake”
+encrypted index and later, when given a search result, can
+generate an appropriate token (i.e., a token that when used
+with the fake index will yield the correct search outcome).
+Unfortunately, the techniques from [8] and [6] do not work
+in our setting. The main problem is that in the dynamic
+setting there are situations where the previously described
+level of equivocation is not enough.
+In particular, consider an adversary that first searches for
+a keyword w, then adds a file that contains w and, finally,
+searches for w again. To see why the previous level of equivocation does not suffice, notice that after the first search the
+simulator is committed to a token for w. Now, after the adversary adds a file with w, the simulator needs to simulate
+an add token for that file. The simulator, however, does not
+know what the file is or even that it contains w so it cannot
+produce a token that functions properly, i.e., the add token
+it simulates cannot make any meaningful change to the encrypted index. The problem is that after the adversary performs the second search for w, he expects this new search
+to reveal at least one new result compared to the previous
+one. In particular, the search should now also reveal the new
+file’s identifier. But if the add token cannot properly modify
+the encrypted index in the second stage and if the simulator
+cannot send a new token during the third stage (since it is
+committed) then how can the simulator guarantee that the
+adversary will get an updated search result?
+We overcome this by constructing a scheme that allows
+the simulator to modify the outcome of the search during
+the adversary’s execution of the search algorithm. Note that
+this is a departure from the approaches of [8] and [6] which
+manipulate the outcome of the adversary’s search by creating specially designed tokens. We do this by making use of
+
+the random oracle model. At a very high level, we design
+our encrypted index in a way that requires the adversary
+to query a random oracle during various steps of the search
+algorithm. The simulator is then able to program the responses of the random oracle in a way that suits it and can
+make sure that the execution of the search yields the outcome it wants.
+
+6. PERFORMANCE
+6.1 Implementation
+To demonstrate the feasibility of our algorithms, we implemented SSE in C++ over the Microsoft Cryptography API:
+Next Generation (CNG) [7]. Our implementation uses the
+algorithms described in §4. The cryptographic primitives
+for our protocol use CNG. Encryption is the CNG implementation of 128-bit AES-CBC [13], and the hash function
+is the CNG implementation of SHA-256 [12]. SSE employs
+two random oracles, which are implemented using HMACSHA256 from CNG (this employs the HMAC construction
+first described by Bellare, Canetti, and Krawczyk [3]). The
+first parameter passed to the random oracle is used as a key
+to the HMAC, and the second parameter is used as input to
+the HMAC.5
+A system that implements SSE performs two classes of
+time-intensive operations: cryptographic computations and
+systems actions (e.g., network transmission and filesystem
+access). To separate the costs of cryptography from the systems costs (which will vary between underlying systems),
+we built a test framework that performs cryptographic computations on a set of files but does not transfer these files
+across a network or incur the costs of storing and retrieving
+index information from disk; all operations are performed in
+memory. We also ignore the cost of producing a plain-text
+index for the files, since the choice and implementation of
+an indexing algorithm is orthogonal to SSE.
+
+6.2 Experiments
+Cryptographic operations in SSE require widely varying
+amounts of time to execute. So, to evaluate SSE, we performed micro-benchmarks and full performance tests on the
+system and broke each test out into its component algorithms. The micro-benchmarks are used to explain the performance of the full system.
+These experiments were performed on an Intel Xeon CPU
+2.26 GHz (L5520) running Windows Server 2008 R2. All experiments ran single-threaded on the processors. Each data
+point presented in the experiments is the mean of 10 executions, and error bars provide the sample standard deviation.
+The unit of measurement in all of the microbenchmarks
+is the file/word pair : for a given file f the set of file/word
+pairs is comprised of all unique pairs (f , w) such that w is
+a word associated with f in the index. The set of all such
+tuples across all files in a file collection is exactly the set of
+entries in a keyword index for this collection.
+We chose three sets of real-world data for our experiments.
+The first set was selected from the Enron emails [11]; we extracted a subset of emails and used decreasing subsets of
+5
+Recent work by Dodis, Ristenpart, Steinberger, and Tessaro [10] shows that HMAC is indifferentiable from a random
+oracle when the key used has length shorter than d−1, where
+d is the block length of the underlying hash function. Our
+keys are 32-bytes in length and satisfy the theorem.
+
+973
+
+Time Per Pair (µs)
+
+this original subset as file collections with different numbers
+of file/word pairs. The second set consisted of Microsoft
+Office documents (using the Word, PowerPoint, and Excel
+file types) used by a business group in Microsoft for its internal planning and development. In a similar fashion to
+the emails, we chose decreasing subsets of this collection as
+smaller file collections. The third data set consists of media
+files, which have almost no indexable words but have large
+file size. This collection is composed of MP3, video, WMA,
+and JPG files that make data sets of the same sizes as the
+ones in the document collection. To index the emails, documents and media, we used an indexer that employs IFilter
+plugins in Windows to extract unique words from each file.
+The indexer also extracts properties of the files from the
+NTFS filesystem, such as the author of a Microsoft Word
+document, or the artist or genre of an MP3 file.
+
+100
+
+Zipf
+Docs
+Emails
+
+35
+100000
+
+500000
+
+1000000
+
+1500000
+
+File/Word Pairs
+Figure 4: Execution time for SSE.Enc.
+Table 2: Execution time (in µs) per unit (word or
+file) for SSE operations.
+operation time stddev
+SSE.Search
+7.3
+0.6
+SSE.AddToken
+37
+2
+SSE.DelToken
+3.0
+0.2
+SSE.Add
+1.6
+0.4
+SSE.Del
+24
+1
+
+6.2.1 Micro-benchmarks
+To determine the performance of SSE, we generated synthetic indexes and executed search and update operations
+on them. For searches, we chose the word that was present
+in most files. And we deleted and added back in a file with
+the largest number of unique words in the index. We only
+compared against the email and document data sets for our
+micro-benchmarks, since the media data set index size was
+too small for useful comparisons.
+We generated our synthetic indexes from a pair of Zipf
+distributions [24] with parameter α = 1.1; one distribution
+contained randomly-generated files, and the other contained
+words (the words in our case were simply numbers represented as strings: “0”, “1”, “2”, etc.). The synthetic file collection was generated as follows. First, the test code drew a
+file f from the Zipf file distribution (our sampling employed
+the algorithm ZRI from Hörman and Derflinger [17]). Second, the test code drew words from the word distribution
+until it found a word that was not in the index for f . It
+then added this word to the index information for f and
+drew another file to repeat the process until a given number
+of file/word pairs is generated. This process corresponds to
+writing a set of files with Zipf-distributed sizes and containing Zipf-distributed words such that the file collection as a
+whole contains a given number of file/word pairs.
+Figure 4 shows the costs of index generation incurred by
+SSE, expressed as the cost per file/word pair; these are the
+timings for the operations that are performed after a collection of files is indexed (for the total time required to index
+these collections, see the results of Figure 5 in §6). The numbers of pairs range from about 14,000 to about 1,500,000 in
+number. The synthetic data is labeled with “Zipf”, the Enron data is labeled with “Email”, and the document data
+is labeled with “Docs”. The cost per file/word pair is an
+amortized value: it was determined by taking the complete
+execution time of each experiment and dividing by the number of file/word pairs.
+The cost per file/word pair in Figure 4 is small: it decreases to about 35 µs per pair. Lower numbers of pairs
+lead to higher per-pair costs, since there is a constant overhead for adding new words and new files to the index, and
+the cost is not amortized over as many pairs in this case.
+The email and document data validate our synthetic model
+and correspond closely to this model (within 10%) for data
+points with approximately the same number of file/word
+pairs. This suggests that, at least for large numbers of pairs,
+
+the Zipf model leads to the same SSE performance as the
+English text as contained in the emails and documents. The
+synthetic data tests the sensitivity of the SSE algorithms to
+details of the file/word distribution; experiments over the file
+collections are limited to always operating over the same assignment of unique words to files, but different experiments
+over the synthetic data contain different sets of file/word
+pairs, albeit drawn from the same distribution. Since our
+synthetic results match closely our results from real-world
+data sets, this sensitivity is low, as would be expected.
+Micro-benchmark execution time for SSE algorithms does
+not depend on the number of file/word pairs in the index.
+And their cost per unique word is essentially independent
+(modulo a very small constant cost) of the total number of
+unique words (or files) in each operation. So, we present
+only the per-word (or per-file) time for these operations.
+Table 2 shows the costs for each operation. For ease of
+exposition, we show numbers only for the executions of the
+SSE algorithm on the document data set; the numbers for
+the email data set and the synthetic data are similar. Search
+token generation takes a constant amount of time (a mean
+of 35 µs), irrespective of the number of files that will be
+returned from the search. The results show that search and
+file addition and deletion on the client side are efficient and
+practical, even for common words, or files containing many
+unique words.
+
+6.2.2 Full performance
+To evaluate the performance of SSE as a whole, we ran
+the SSE algorithms specified in § 4 on the email, document
+and media data sets. Note that all algorithms displayed on
+the graphs have non-zero cost, but in some cases, the cost is
+so small compared to the cost of other parts of the operation
+that this cost cannot be seen on the graph.
+Figure 5 shows the results of the encryption operation,
+which takes the most time of any of the algorithms. Note
+that the entire encryption protocol is performed in addition
+to indexing that must be executed by the client before the
+data can be stored.
+
+974
+
+SSE.Enc
+SKE.Enc
+
+Time (ms)
+
+Time (s)
+
+52
+33
+14
+
+53
+34
+17
+
+4 11 16
+8 100 250 500
+8 100 250 500
+Documents
+Emails
+Media
+File Collections (with size in MB)
+
+4 11 16
+8 100 250 500
+8 100 250 500
+Documents
+Emails
+Media
+File Collections (with size in MB)
+
+Figure 5: Execution time for SSE.Enc and SKE.Enc.
+
+Figure 6: Execution time for SSE.Search.
+
+Figure 5 shows the difference between the email data and
+the document data. The Enron emails are a collection of
+plain text files, including email headers, so almost every byte
+of the files is part of a word that will be indexed. So, each
+small file contains many words, and the ratio of file/word
+pairs to the size of the data set is high. By contrast, Microsoft Office documents may contain significant formatting
+and visual components (like images) which are not indexed.
+So, the ratio of file/word pairs to file size is much lower.
+Both data sets represent a common case for office use: our
+results show that SSE index generation requires significantly
+more time for large text collections than for the common office document formats. Finally, the ratio of indexable words
+to file size is almost zero for the media files.
+The micro-benchmark results of Figure 4 show that SSE
+index generation performance is linear in the number of
+file/word pairs for large data sets. So, for an email data
+set of size 16 GB (consisting entirely of text-based emails:
+i.e., emails containing no attachments), the initial indexing
+costs would be approximately 15 hours (which could be performed over the course of a day during the idle time of the
+computer). After this initial indexing, adding and removing
+emails would be fast.
+To evaluate the costs of the remaining SSE algorithms
+we performed experiments that gave upper bounds on the
+cost of any operation. An upper bound for SSE.Search is a
+search for the word contained in the most files. Our update
+operations, use the file with the most bytes on disk.
+Since search was performed for the word that was indexed
+for the most files, the total time needed for the search depended on the prevalence of words in files: media files had
+few words, even in 500 MB of content, whereas some words
+occur in every email. Figure 6 gives the time needed for
+the server to perform a search, given a search token (we
+neglect the cost of generating a search token, since it is a
+small constant in microseconds). The SSE search costs were
+small, even for the email index. However, even the longest
+searches took only about 50 ms to complete. And for large
+media collections, the search time was negligibly small.6
+Figure 7 shows the execution time for adding a file. The
+
+Time (ms)
+
+500
+
+Enc
+SSE.Add
+
+SSE.AddToken
+
+250
+
+0
+
+4 11 16
+8 100 250 500
+8 100 250 500
+Documents
+Emails
+Media
+File Collections (with size in MB)
+
+Figure 7: Execution time for adding a file.
+
+cost of the operation is divided into several components:
+“Enc” refers to the time needed to encrypt the new file,
+“SSE.AddToken” refers to client generation of the add token for the words being indexed in the file, and “SSE.Add”
+refers to the server using the add token to update the index. The costs of adding a file fall mostly on the client:
+the dominant costs are SSE add token generation, and file
+encryption, both performed on the client. In a use case
+where add operations dominate (such as indexing encrypted
+emails), this allows the server to support many clients easily,
+since the client that performs the add also performs most of
+the computations.
+A similar situation occurs in Figure 8 for deleting a file.
+The label “SSE.DelToken” refers to client generation of the
+delete token, and “SSE.Del” refers to the server using the
+delete token to update the index. As for add, the delete
+operation is efficient and practical; each operation on the
+largest files took approximately half a second.
+
+Time (ms)
+
+130
+
+6
+Note that in our workloads, the time to decrypt all files returned from search dominates the search costs by orders of
+magnitude. Higher-level protocols could mitigate this cost
+by using the SSE primitive in a different manner: instead
+of storing the files directly, it could store short, fixed-length
+descriptions of the files. The client could decrypt these results quickly then use their information to decide which files
+to download and decrypt. This would also allow clients to
+delete a file without downloading the file from the server.
+
+100
+75
+
+0
+
+SSE.DelToken
+SSE.Del
+
+4 11 16
+8 100 250 500
+8 100 250 500
+Documents
+Emails
+Media
+File Collections (with size in MB)
+
+Figure 8: Execution time for deleting a file.
+
+975
+
+7.
+
+CONCLUSION
+
+[10] Y. Dodis, T. Ristenpart, J. Steinberger, and
+S. Tessaro. To hash or not to hash again?
+(in)differentiability results for H 2 and HMAC. Proc.
+Int. Cryptology Conference (CRYPTO), 2012.
+[11] Enron email dataset.
+http://www.cs.cmu.edu/˜enron/, 2009.
+[12] FIPS 180-3. Secure Hash Standard (SHS). Federal
+Information Processing Standard (FIPS), Publication
+180-3, National Institute of Standards and Technology,
+Washington, DC, October 2008.
+[13] FIPS 197. Advanced Encryption Standard (AES).
+Federal Information Processing Standard (FIPS),
+Publication 197, National Institute of Standards and
+Technology, Washington, DC, November 2001.
+[14] M. Fredman, J. Komlos, and E. Szemeredi. Storing a
+sparse table with O(1) worst case access time. Journal
+of the ACM, 31(3):538–544, 1984.
+[15] E.-J. Goh. Secure indexes. Technical Report 2003/216,
+IACR ePrint Cryptography Archive, 2003.
+http://eprint.iacr.org/2003/216.
+[16] O. Goldreich and R. Ostrovsky. Software protection
+and simulation on oblivious RAMs. Journal of the
+ACM, 43(3):431–473, 1996.
+[17] W. Hörmann and G. Derflinger. Rejection-inversion to
+generate variates from monotone discrete
+distributions. ACM Transactions on Modeling and
+Computer Simulation, 6(3):169–184, 1996.
+[18] M. Islam, M. Kuzu and M. Kantarcioglu. Access
+Pattern disclosure on Searchable Encryption:
+Ramification, Attack and Mitigation. Network and
+Distributed System Security Symposium (NDSS ’12),
+2012.
+[19] S. Kamara and K. Lauter. Cryptographic cloud
+storage. In Proc. Workshop Real-Life Cryptographic
+Protocols and Standardization (RLCPS), pages
+136–149, 2010.
+[20] J. Katz and Y. Lindell. Introduction to Modern
+Cryptography. Chapman & Hall/CRC, Boca Raton,
+FL, 2008.
+[21] K. Kurosawa and Y. Ohtaki. UC-secure searchable
+symmetric encryption. In Proc. Financial
+Cryptography and Data Security (FC), 2012.
+[22] D. Song, D. Wagner, and A. Perrig. Practical
+techniques for searching on encrypted data. In Proc.
+Symposium on Research in Security and Privacy
+(SSP), pages 44–55, 2000.
+[23] P. van Liesdonk, S. Sedghi, J. Doumen, P. H. Hartel,
+and W. Jonker. Computationally efficient searchable
+symmetric encryption. In Proc. Workshop on Secure
+Data Management (SDM), pages 87–100, 2010.
+[24] G. K. Zipf. Psycho-Biology of Languages.
+Houghton-Mifflin, Boston, 1935.
+
+Searchable encryption is an important cryptographic primitive that is well motivated by the popularity of cloud storage
+services like Dropbox, Microsoft Skydrive and Apple iCloud
+and public cloud storage infrastructures like Amazon S3 and
+Microsoft Azure Storage. Any practical SSE scheme, however, should satisfy certain properties such as sublinear (and
+preferably optimal) search, adaptive security, compactness
+and the ability to support addition and deletion of files.
+In this work, we gave the first SSE construction to achieve
+all these properties. In addition, we implemented our scheme
+and evaluated its performance. Our experiments show that
+our construction is highly efficient and ready for deployment.
+
+Acknowledgements
+The authors are grateful to Jason Mackay for writing the
+indexer that was used in the experiments. The second author was partially supported by the Kanellakis fellowship at
+Brown University and by Intel’s STC for Secure Computing.
+
+8.
+
+REFERENCES
+
+[1] G. Amanatidis, A. Boldyreva, and A. O’Neill.
+Provably-secure schemes for basic query support in
+outsourced databases. In Proc. Working Conference
+on Data and Applications Security (DBSEC), pages
+14–30, 2007.
+[2] M. Bellare, A. Boldyreva, and A. O’Neill.
+Deterministic and efficiently searchable encryption.
+Proc. Int. Cryptology Conference (CRYPTO), pages
+535–552, 2007.
+[3] M. Bellare, R. Canetti, and H. Krawczyk. Keying hash
+functions for message authentication. Proc. Int.
+Cryptology Conference (CRYPTO), pages 1–15, 1996.
+[4] D. Boneh, G. Di Crescenzo, R. Ostrovsky,
+G. Persiano. Public key encryption with keyword
+search. Proc. Int. Conference on the Theory and
+Applications of Cryptographic Techniques
+(EUROCRYPT), pages 506–522, 2004.
+[5] Y. Chang and M. Mitzenmacher. Privacy preserving
+keyword searches on remote encrypted data. Proc.
+Applied Cryptography and Network Security (ACNS),
+pages 442–455, 2005.
+[6] M. Chase and S. Kamara. Structured encryption and
+controlled disclosure. In Proc. Int. Conference on the
+Theory and Application of Cryptology and Information
+Security (ASIACRYPT), pages 577–594, 2010.
+[7] Cryptography API: Next generation (Windows).
+http://msdn.microsoft.com/library/aa376210.aspx.
+[8] R. Curtmola, J. Garay, S. Kamara, and R. Ostrovsky.
+Searchable symmetric encryption: Improved
+definitions and efficient constructions. In Proc. ACM
+Conference on Computer and Communications
+Security (CCS), pages 79–88, 2006.
+[9] R. Curtmola, J. Garay, S. Kamara, and R. Ostrovsky.
+Searchable symmetric encryption: Improved
+definitions and efficient constructions. Journal of
+Computer Security, 19(5):895–934, 2011.
+
+976
+
+
