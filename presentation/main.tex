@@ -2,7 +2,8 @@
 \usepackage{tikz}
 \usepackage{graphicx}
 \usetikzlibrary{arrows,matrix,positioning}
-\usetheme[progressbar=frametitle,sectionpage=none]{m}
+%\usetheme[progressbar=frametitle,sectionpage=none]{m}
+\usetheme[progressbar=frametitle]{m}
 \setbeamertemplate{bibliography item}[text]
 
 \title{Dynamic Searchable Symmetric Encryption}
@@ -21,11 +22,24 @@
 \end{frame}
 
 \section{Introduction}
-\begin{frame}{Introduction}
+\begin{frame}{The Scenario}
 \begin{itemize}
-\item SSE allows client to encrypt data such that it can still be searched.
+\item Rise of cloud storage.
+\item Outsource data storage.
+\item Security concerns regarding data privacy.
+\item Na{\"i}ve solution: Encrypt data beforing uploading.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Introduction}
+\begin{block}{Searchable Symmetric Encryption}
+\begin{itemize}
+\item Encrypt data such that it can still be searched.
+\item Generate search tokens to send as queries to server.
+\item Return appropriate encrypted files.
 \item Application: Cloud storage.
 \end{itemize}
+\end{block}
 \end{frame}
 
 \section{Definitions}
@@ -47,7 +61,9 @@
 \begin{block}{Homomorphic Encryption}
 \begin{itemize}
 \item Permit computations on encrypted data.
-\item Obtaining \(E_K(f(x))\) from \(E(x)\).
+\item Obtaining \(E_K(f(x))\) from \(E_K(x)\).
+\item Server learns nothing about data it computed on.
+\item 2 types: Partially HE \& Fully HE.
 \end{itemize}
 \end{block}
 
@@ -66,15 +82,86 @@ random function.
 \end{frame}
 
 
-\section{The SSE-1 scheme}
-\begin{frame}{SSE-1 scheme}
+\section{How it works?}
+\begin{frame}{Requirements}
+\begin{itemize}
+\item A private-key encryption scheme \(\mathtt{SKE}\).
+\item 2 pseudorandom functions \(F\) and \(G\).
+\item \(\mathtt{A}_s\) - search array.
+\item \(\mathtt{T}_s\) - search table.
+\end{itemize}
 \end{frame}
 
-\section{Making SSE-1 dynamic}
-\begin{frame}{Making SSE-1 scheme}
+\begin{frame}{Notation}
+\begin{itemize}
+\item Collection of files \(\mathbf{f} = (f_1, \dotsc, f_n)\)
+\item Each file has unique identifier \(\mathsf{id}(f_i)\)
+\item \(W = \) keyword space.
+\item Map each file to a list of keywords from \(W\).
+\item \(\mathbf{f}_w =\) set of files in \(\mathbf{f}\) that contain
+	\(w\).
+\end{itemize}
 \end{frame}
+
+\begin{frame}[allowframebreaks]
+\frametitle{Working}
+\begin{itemize}
+\item \(\forall w \in W\), construct
+	\(\mathtt{L}_w = (N_1, \dotsc, N_{|f_w|})\)
+\item Each node stored at random locations in \(\mathtt{A}_s\)
+\item \(\mathtt{N}_i = \langle \mathsf{id, addr}_s(\mathtt{N}_{i+1}) \rangle\)
+\item \(K_1\) and \(K_2\) are the keys to the PRF \(F\) and \(G\).
+\item \(\mathtt{T}_s[F_{K_1}(w)] = \) head of \(\mathtt{L}_w\)
+\item Each list encrypted using \(\mathtt{SKE}\) under key \(G_{K_2}(w)\)
+	\framebreak
+\item Send \emph{search array} \(\mathtt{A}_s\),
+	\emph{search table} \(\mathtt{T}_s\) and
+	the collection of encrypted files \(\mathbf{c} = (c_1, \dotsc, c_n)\)
+	to the server.
+\item To search for \(w\), send \(F_{K_1}(w)\) and \(G_{K_2}(w)\).
+\item Use \(F_{K_1}(w)\) to recover the pointer to head of \(\mathtt{L}_w\).
+\item Use \(G_{K_2}(w)\) to decrypt the list.
+\item Running time - \(O(|\mathbf{f_w}|)\)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Making SSE dynamic}
+\begin{itemize}
+\item Allow addition, deletion or modification of a file.
+\item Difficulties:
+
+\begin{enumerate}
+\item Nodes corresponding to a file \(f\) are unknown.
+\item Can't modify pointer of the previous node as it is encrypted.
+\item Free locations in search array are unknown.
+\end{enumerate}
+
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Making SSE dynamic}
+\begin{enumerate}
+\item Store list of pointers to nodes in \(\mathtt{A}_s\)
+	corresponding to a file \(f\) in the
+	data structures \(\mathtt{A}_d\) and \(\mathtt{T}_d\)
+	called the \emph{deletion array} and \emph{deletion table}.
+\item Encrypt pointers with a homomorphic encryption scheme.
+\item Keep track of free locations in \(\mathtt{A}_s\) in a \emph{free list}.
+\end{enumerate}
+\end{frame}
+
 
 \section{Example}
+
+\begin{frame}{Making SSE dynamic}
+\begin{itemize}
+\item 3 files \(f_1, f_2, f_3\)
+\item \(W = \{w_1, w_2, w_3\}\)
+\item \(w_1\) is contained in all files, \(w_2\) only in \(f_2\) and \(w_3\)
+	in \(f_2\) and \(f_3\)
+\end{itemize}
+\end{frame}
+
 \begin{frame}[fragile]
 \frametitle{Example}
 
@@ -127,8 +214,6 @@ scale=0.7]
 \includegraphics[trim=55mm 175mm 43mm 60mm, clip, width=0.9\textwidth]{../paper/pg_0005.pdf}
 \end{center}
 \end{frame}
-
-\section{Conclusion}
 
 \plain{Questions?}
 
