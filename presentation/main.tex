@@ -82,7 +82,7 @@ random function.
 \end{frame}
 
 
-\section{How it works?}
+\section{The construction}
 \begin{frame}{Requirements}
 \begin{itemize}
 \item A private-key encryption scheme \(\mathtt{SKE}\).
@@ -92,7 +92,7 @@ random function.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Notation}
+\begin{frame}{Input}
 \begin{itemize}
 \item Collection of files \(\mathbf{f} = (f_1, \dotsc, f_n)\)
 \item Each file has unique identifier \(\mathsf{id}(f_i)\)
@@ -122,10 +122,12 @@ random function.
 \item Use \(F_{K_1}(w)\) to recover the pointer to head of \(\mathtt{L}_w\).
 \item Use \(G_{K_2}(w)\) to decrypt the list.
 \item Running time - \(O(|\mathbf{f_w}|)\)
+\item Leakage of statistical information.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Making SSE dynamic}
+\begin{frame}[allowframebreaks]
+\frametitle{Making SSE dynamic}
 \begin{itemize}
 \item Allow addition, deletion or modification of a file.
 \item Difficulties:
@@ -137,9 +139,8 @@ random function.
 \end{enumerate}
 
 \end{itemize}
-\end{frame}
 
-\begin{frame}{Making SSE dynamic}
+\framebreak
 \begin{enumerate}
 \item Store list of pointers to nodes in \(\mathtt{A}_s\)
 	corresponding to a file \(f\) in the
@@ -150,17 +151,8 @@ random function.
 \end{enumerate}
 \end{frame}
 
-
 \section{Example}
 
-\begin{frame}{Making SSE dynamic}
-\begin{itemize}
-\item 3 files \(f_1, f_2, f_3\)
-\item \(W = \{w_1, w_2, w_3\}\)
-\item \(w_1\) is contained in all files, \(w_2\) only in \(f_2\) and \(w_3\)
-	in \(f_2\) and \(f_3\)
-\end{itemize}
-\end{frame}
 
 \begin{frame}[fragile]
 \frametitle{Example}
@@ -214,6 +206,119 @@ scale=0.7]
 \includegraphics[trim=55mm 175mm 43mm 60mm, clip, width=0.9\textwidth]{../paper/pg_0005.pdf}
 \end{center}
 \end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{Example - Adding a file}
+
+\begin{center}
+\begin{columns}
+\column{0.05\textwidth}
+\column{0.4\textwidth}
+\footnotesize{\textbf{Index}}\\
+\begin{tikzpicture}[
+roundnode/.style={circle, draw},
+squarednode/.style={rectangle, draw},
+every node/.append style={transform shape},
+scale=0.6]
+% Nodes
+\node[squarednode] (w1) {\(w_1\)};
+\node[squarednode] (w2) [below=of w1] {\(w_2\)};
+\node[squarednode] (w3) [below=of w2] {\(w_3\)};
+\node[roundnode] (f11) [right=of w1] {\(f_1\)};
+\node[roundnode] (f12) [right=of f11] {\(f_2\)};
+\node[roundnode] (f13) [right=of f12] {\(f_3\)};
+\node[roundnode] (f14) [right=of f13] {\(f_4\)};
+\node[roundnode] (f22) [right=of w2] {\(f_2\)};
+\node[roundnode] (f24) [right=of f22] {\(f_4\)};
+\node[roundnode] (f32) [right=of w3] {\(f_2\)};
+\node[roundnode] (f33) [right=of f32] {\(f_3\)};
+% Lines
+\draw[arrows={-latex}] (w1) -- (f11);
+\draw[arrows={-latex}] (f11) -- (f12);
+\draw[arrows={-latex}] (f12) -- (f13);
+\draw[arrows={-latex}] (f13) -- (f14);
+\draw[arrows={-latex}] (w2) -- (f22);
+\draw[arrows={-latex}] (f22) -- (f24);
+\draw[arrows={-latex}] (w3) -- (f32);
+\draw[arrows={-latex}] (f32) -- (f33);
+\draw[densely dotted,arrows={-latex}] (f12) -- (f22);
+\draw[densely dotted,arrows={-latex}] (f14) -- (f24);
+\draw[densely dotted,arrows={-latex}] (f22) -- (f32);
+\draw[densely dotted,arrows={-latex}] (f33) -- (f13);
+\end{tikzpicture}
+\column{0.3\textwidth}
+\footnotesize{\textbf{Search Table} \(\mathtt{T}_s\)}
+\(F_{K_1}(w_1) \rightarrow 4\)\\
+\(F_{K_1}(w_2) \rightarrow 0\)\\
+\(F_{K_1}(w_3) \rightarrow 5\)\\
+\column{0.3\textwidth}
+\footnotesize{\textbf{Deletion Table} \(\mathtt{T}_d\)}
+\(F_{K_1}(f_1) \rightarrow 1\)\\
+\(F_{K_1}(f_2) \rightarrow 5\)\\
+\(F_{K_1}(f_3) \rightarrow 4\)\\
+\(F_{K_1}(f_4) \rightarrow 3\)
+\end{columns}
+
+\vspace{2ex}
+\hrule
+\includegraphics[trim=55mm 175mm 73mm 60mm, clip, width=0.7\textwidth]{../paper/pg_0005_add.pdf}
+\end{center}
+\end{frame}
+
+
+\begin{frame}[fragile]
+\frametitle{Example - Deleting a file}
+
+\begin{center}
+\begin{columns}
+\column{0.05\textwidth}
+\column{0.4\textwidth}
+\footnotesize{\textbf{Index}}\\
+\begin{tikzpicture}[
+roundnode/.style={circle, draw},
+squarednode/.style={rectangle, draw},
+every node/.append style={transform shape},
+scale=0.6]
+% Nodes
+\node[squarednode] (w1) {\(w_1\)};
+\node[squarednode] (w2) [below=of w1] {\(w_2\)};
+\node[squarednode] (w3) [below=of w2] {\(w_3\)};
+\node[roundnode] (f11) [right=of w1] {\(f_1\)};
+\node[roundnode] (f12) [right=of f11] {\(f_2\)};
+\node[roundnode] (f14) [right=of f12] {\(f_4\)};
+\node[roundnode] (f22) [right=of w2] {\(f_2\)};
+\node[roundnode] (f24) [right=of f22] {\(f_4\)};
+\node[roundnode] (f32) [right=of w3] {\(f_2\)};
+% Lines
+\draw[arrows={-latex}] (w1) -- (f11);
+\draw[arrows={-latex}] (f11) -- (f12);
+\draw[arrows={-latex}] (f12) -- (f14);
+\draw[arrows={-latex}] (w2) -- (f22);
+\draw[arrows={-latex}] (f22) -- (f24);
+\draw[arrows={-latex}] (w3) -- (f32);
+\draw[densely dotted,arrows={-latex}] (f12) -- (f22);
+\draw[densely dotted,arrows={-latex}] (f14) -- (f24);
+\draw[densely dotted,arrows={-latex}] (f22) -- (f32);
+\end{tikzpicture}
+\column{0.3\textwidth}
+\footnotesize{\textbf{Search Table} \(\mathtt{T}_s\)}
+\(F_{K_1}(w_1) \rightarrow 4\)\\
+\(F_{K_1}(w_2) \rightarrow 0\)\\
+\(F_{K_1}(w_3) \rightarrow 5\)\\
+\column{0.3\textwidth}
+\footnotesize{\textbf{Deletion Table} \(\mathtt{T}_d\)}
+\(F_{K_1}(f_1) \rightarrow 1\)\\
+\(F_{K_1}(f_2) \rightarrow 5\)\\
+\(F_{K_1}(f_4) \rightarrow 3\)
+\end{columns}
+
+\vspace{2ex}
+\hrule
+\includegraphics[trim=55mm 175mm 73mm 60mm, clip, width=0.7\textwidth]{../paper/pg_0005_del.pdf}
+\end{center}
+\end{frame}
+
 
 \plain{Questions?}
 
