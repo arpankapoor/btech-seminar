@@ -2,7 +2,7 @@
 \usepackage{algorithm,algpseudocode}
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage[english]{babel}
-\usepackage[backend=biber]{biblatex}
+\usepackage[backend=biber,style=ieee]{biblatex}
 \usepackage[utf8]{inputenc}		% This has to come before csquotes
 \usepackage{csquotes}
 \usepackage[T1]{fontenc}		% Use 8-bit CM-like font set
@@ -59,11 +59,32 @@ addressing encrypted search. It allows a client to encrypt data in such a
 way that it can later generate search tokens to send as queries to a storage
 server. Given a token, the server can search over the encrypted data and return
 the appropriate encrypted files.
+
+The most immediate application of SSE is to the design of searchable
+cryptographic cloud storage systems which can provide end-to-end security
+for cloud storage systems without sacrificing utility. Other applications
+include the design of graph encryption schemes and controlled disclosure
+mechanisms \cite{Kamara}.
+
+A perfect solution to searchable encryption is theoretically offered by
+Fully Homomorphic Encryption. It is a form of encryption that allows
+computations to be carried out on ciphertext, thus generating an
+encrypted result which, when decrypted, matches the result of
+operations performed on the plaintext. If the operation is that of searching,
+we have a perfect solution to our problem of searching encrypted data.
+However, Fully Homomorphic Encryption was an open problem till 2009, when
+Craig Gentry described the first plausible construction
+for a fully homomorphic encryption scheme using lattice-based cryptography.
+
+Even though it is now known that we can have Fully Homomorphic Encryption,
+all current solutions are extremely inefficient and impractical
+for most real-world situations.
 \clearpage
 
 \section{Preliminaries}
 
 \begin{definition}[Symmetric Key Encryption]
+\cite{Kamara}
 A private-key encryption scheme is a set of three polynomial-time algorithms
 \(\mathsf{SKE = (Gen, Enc, Dec)}\) such that:
 \begin{enumerate}
@@ -79,10 +100,11 @@ A private-key encryption scheme is a set of three polynomial-time algorithms
 
 
 \begin{definition}[Pseudorandom Function]
+\cite{katz2014}
 A polynomial-time computable function that cannot be distinguished from random
 functions by any probabilistic polynomial-time adversary.
 
-\noindent A funtion \(F \colon \{0,1\}^n \times \{0,1\}^s \rightarrow \{0,1\}^m\)
+\noindent A function \(F \colon \{0,1\}^n \times \{0,1\}^s \rightarrow \{0,1\}^m\)
 is a PRF if
 \begin{itemize}
 \item Given a key \(K\in\{0,1\}^s\) and an input \(X\in\{0,1\}^n\) there is an
@@ -96,6 +118,7 @@ is a PRF if
 
 
 \begin{definition}[Homomorphic Encryption]
+\cite{katz2014}
 An operation performed on a set of ciphertexts such that decrypting
 the result of the operation is the same as the result of some operation
 performed on the plaintexts.
@@ -123,6 +146,7 @@ encryptions of the files in \(\mathbf{f}\), then \(\mathbf{c}_w\) refers
 to the ciphertexts that are encryptions of the files in \(\mathbf{f}_w\).
 
 \begin{definition}[Dynamic SSE]
+\cite{Kamara}
 A dynamic index-based SSE scheme is a set of nine polynomial-time algorithms
 \(\mathsf{SSE = (Gen,}\) \(\mathsf{Enc,}\) \(\mathsf{SrchToken,}\)
 \(\mathsf{AddToken,}\) \(\mathsf{DelToken,}\) \(\mathsf{Search,}\)
@@ -244,7 +268,7 @@ This is difficult for the server to do since:
 	\(\mathtt{A}_s\) are free.
 \end{enumerate}
 
-At a high level, these limitations are addressed as follows:
+At a high level, these limitations are addressed as follows \cite{Kamara}:
 
 
 \begin{enumerate}
@@ -273,7 +297,7 @@ in open information and communication infrastructures like Amazon S3 and
 Microsoft Azure Storage. For example, legislation around the world
 stipulates that electronic health records (EHRs) should be encrypted,
 which immediately raises the question of how to search EHRs efficiently
-and securely.
+and securely \cite{Bosch}.
 
 A lot of developments have taken place in this line of study over the
 past decade and research continues in the uncharted areas that are not
